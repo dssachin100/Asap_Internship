@@ -12,7 +12,7 @@ st.set_page_config(page_title="Movie Genre Classifier", layout="centered")
 st.title("🎬 Movie Genre Classification App")
 
 # -------------------------------
-# Load Data from ZIP
+# Load Data from ZIP (Cached)
 # -------------------------------
 @st.cache_data
 def load_data_from_zip(zip_path, file_name):
@@ -26,30 +26,32 @@ def load_data_from_zip(zip_path, file_name):
             )
     return df
 
-# Change names if needed
 train_data = load_data_from_zip(
     "train_data.zip",
     "train_data.txt"
 )
 
 # -------------------------------
-# Preprocessing
+# Train Model ONCE (Cloud Safe)
 # -------------------------------
-tfidf = TfidfVectorizer(
-    stop_words="english",
-    max_features=50000   # keeps memory usage low
-)
+@st.cache_resource
+def train_model(train_data):
+    tfidf = TfidfVectorizer(
+        stop_words="english",
+        max_features=50000
+    )
+    X_train = tfidf.fit_transform(train_data["DESCRIPTION"])
 
-X_train = tfidf.fit_transform(train_data["DESCRIPTION"])
+    label_encoder = LabelEncoder()
+    y_train = label_encoder.fit_transform(train_data["GENRE"])
 
-label_encoder = LabelEncoder()
-y_train = label_encoder.fit_transform(train_data["GENRE"])
+    model = SVC(kernel="linear")
+    model.fit(X_train, y_train)
 
-# -------------------------------
-# Model Training
-# -------------------------------
-model = SVC(kernel="linear")
-model.fit(X_train, y_train)
+    return model, tfidf, label_encoder
+
+
+model, tfidf, label_encoder = train_model(train_data)
 
 # -------------------------------
 # User Input
@@ -76,7 +78,8 @@ if st.button("🎯 Predict Genre"):
 st.sidebar.header("ℹ️ App Info")
 st.sidebar.write("""
 • Dataset loaded from ZIP  
+• Model trained once using cache  
 • Algorithm: SVM  
 • Vectorizer: TF-IDF  
-• Handles large files efficiently  
+• Optimized for Streamlit Cloud  
 """)
