@@ -1,42 +1,52 @@
 import streamlit as st
 import pandas as pd
+import zipfile
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 
 # -------------------------------
-# App Title
+# App Config
 # -------------------------------
 st.set_page_config(page_title="Movie Genre Classifier", layout="centered")
 st.title("🎬 Movie Genre Classification App")
-st.write("Predict the **genre of a movie** based on its description using ML (TF-IDF + SVM).")
 
 # -------------------------------
-# Load Data
+# Load Data from ZIP
 # -------------------------------
 @st.cache_data
-def load_data():
-    train_data = pd.read_csv(
-        "train_data.txt",
-        sep=":::",
-        engine="python",
-        names=["ID", "TITLE", "GENRE", "DESCRIPTION"]
-    )
-    return train_data
+def load_data_from_zip(zip_path, file_name):
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        with z.open(file_name) as f:
+            df = pd.read_csv(
+                f,
+                sep=":::",
+                engine="python",
+                names=["ID", "TITLE", "GENRE", "DESCRIPTION"]
+            )
+    return df
 
-train_data = load_data()
+# Change names if needed
+train_data = load_data_from_zip(
+    "train_data.zip",
+    "train_data.txt"
+)
 
 # -------------------------------
 # Preprocessing
 # -------------------------------
-tfidf = TfidfVectorizer(stop_words="english")
+tfidf = TfidfVectorizer(
+    stop_words="english",
+    max_features=50000   # keeps memory usage low
+)
+
 X_train = tfidf.fit_transform(train_data["DESCRIPTION"])
 
 label_encoder = LabelEncoder()
 y_train = label_encoder.fit_transform(train_data["GENRE"])
 
 # -------------------------------
-# Train Model
+# Model Training
 # -------------------------------
 model = SVC(kernel="linear")
 model.fit(X_train, y_train)
@@ -45,30 +55,28 @@ model.fit(X_train, y_train)
 # User Input
 # -------------------------------
 st.subheader("📝 Enter Movie Description")
+
 user_input = st.text_area(
-    "Type or paste the movie description here:",
+    "Movie description:",
     height=150
 )
 
-# -------------------------------
-# Prediction
-# -------------------------------
 if st.button("🎯 Predict Genre"):
     if user_input.strip() == "":
-        st.warning("Please enter a movie description.")
+        st.warning("Please enter a description.")
     else:
-        input_vector = tfidf.transform([user_input])
-        prediction = model.predict(input_vector)
+        vector = tfidf.transform([user_input])
+        prediction = model.predict(vector)
         genre = label_encoder.inverse_transform(prediction)[0]
-
         st.success(f"🎉 Predicted Genre: **{genre}**")
 
 # -------------------------------
-# Sidebar Info
+# Sidebar
 # -------------------------------
-st.sidebar.header("ℹ️ About")
+st.sidebar.header("ℹ️ App Info")
 st.sidebar.write("""
-- **Algorithm:** Support Vector Machine (SVM)
-- **Text Vectorization:** TF-IDF
-- **Task:** Movie Genre Classification
+• Dataset loaded from ZIP  
+• Algorithm: SVM  
+• Vectorizer: TF-IDF  
+• Handles large files efficiently  
 """)
